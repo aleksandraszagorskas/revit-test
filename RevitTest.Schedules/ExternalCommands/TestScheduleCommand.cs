@@ -50,9 +50,10 @@ namespace RevitTest.Schedules.ExternalCommands
             }
             catch (Exception ex)
             {
-
-                throw;
+                field = null;
+                throw new Exception("Page parameter does not exist");
             }
+
             if (field != null)
             {
                 using (Transaction transaction = new Transaction(doc, "Handle schedule"))
@@ -68,7 +69,7 @@ namespace RevitTest.Schedules.ExternalCommands
                     }
                     catch (Exception ex)
                     {
-
+                        //Filter not added
 
                     }
 
@@ -81,6 +82,12 @@ namespace RevitTest.Schedules.ExternalCommands
 
         }
 
+        /// <summary>
+        /// Export sheet to PDF
+        /// </summary>
+        /// <param name="doc"></param>
+        /// <param name="sheet"></param>
+        /// <param name="fileName"></param>
         private void ExportSheetToPDF(Document doc, ViewSheet sheet, string fileName)
         {
             //print
@@ -104,6 +111,14 @@ namespace RevitTest.Schedules.ExternalCommands
             printManager.SubmitPrint();
         }
 
+
+        /// <summary>
+        /// Create sheet for schedule
+        /// </summary>
+        /// <param name="doc"></param>
+        /// <param name="schedule"></param>
+        /// <param name="scheduleName"></param>
+        /// <returns></returns>
         private ViewSheet CreateScheduleSheet(Document doc, ViewSchedule schedule, string scheduleName)
         {
             ViewSheet sheet = null;
@@ -134,6 +149,13 @@ namespace RevitTest.Schedules.ExternalCommands
         //    return titleBlocks.Where(tb => tb.Name == titleBlockName).First().Id;
         //}
 
+        /// <summary>
+        /// Create schedule
+        /// </summary>
+        /// <param name="doc"></param>
+        /// <param name="scheduleName"></param>
+        /// <param name="message"></param>
+        /// <returns></returns>
         private ViewSchedule CreateSchedule(Document doc, string scheduleName, ref string message)
         {
             ViewSchedule schedule = GetSchedule(doc, scheduleName);
@@ -181,6 +203,12 @@ namespace RevitTest.Schedules.ExternalCommands
             return schedule;
         }
 
+        /// <summary>
+        /// Get existing schedule
+        /// </summary>
+        /// <param name="doc"></param>
+        /// <param name="scheduleName"></param>
+        /// <returns></returns>
         private ViewSchedule GetSchedule(Document doc, string scheduleName)
         {
             FilteredElementCollector collector = new FilteredElementCollector(doc);
