@@ -27,25 +27,11 @@ namespace RevitTest.Schedules.ExternalCommands
                 var scheduleName = "Wall schedule";
 
                 ViewSchedule schedule = CreateSchedule(doc, scheduleName, ref message);
-                if (schedule != null)
-                {
-                    ViewSheet sheet = CreateScheduleSheet(doc, schedule, scheduleName);
-                    if (sheet != null)
-                    {
-                        uidoc.ActiveView = sheet;
+                HandleSchedule(doc, schedule);
+                ViewSheet sheet = CreateScheduleSheet(doc, schedule, scheduleName);
+                uidoc.ActiveView = sheet;
 
-                        ExportSheetToPDF(doc, sheet, scheduleName);
-                    }
-                    else
-                    {
-                        return Result.Failed;
-                    }
-                }
-                else
-                {
-                    return Result.Failed;
-                }
-
+                ExportSheetToPDF(doc, sheet, scheduleName);
                 return Result.Succeeded;
             }
             catch (Exception ex)
@@ -55,30 +41,67 @@ namespace RevitTest.Schedules.ExternalCommands
             }
         }
 
+        private void HandleSchedule(Document doc, ViewSchedule schedule)
+        {
+            ScheduleField field = null;
+            try
+            {
+                field = schedule.Definition.GetField(4);
+            }
+            catch (Exception ex)
+            {
+
+                throw;
+            }
+            if (field != null)
+            {
+                using (Transaction transaction = new Transaction(doc, "Handle schedule"))
+                {
+                    transaction.Start();
+
+                    field.IsHidden = true;
+
+                    try
+                    {
+                        var filter = new ScheduleFilter(field.FieldId, ScheduleFilterType.Equal, 2);
+                        schedule.Definition.AddFilter(filter);
+                    }
+                    catch (Exception ex)
+                    {
+
+
+                    }
+
+
+
+                    transaction.Commit();
+                }
+            }
+
+
+        }
+
         private void ExportSheetToPDF(Document doc, ViewSheet sheet, string fileName)
         {
+            //print
+            var printManager = doc.PrintManager;
+            printManager.SelectNewPrintDriver("Microsoft Print To PDF");
+            printManager.PrintRange = PrintRange.Select;
+            printManager.CombinedFile = true;
+
+            ViewSheetSetting viewSheetSetting = printManager.ViewSheetSetting;
+
+            var viewSet = new ViewSet();
+            viewSet.Insert(sheet);
+
             using (Transaction transaction = new Transaction(doc, "Export sheet"))
             {
                 transaction.Start();
-
-                //print
-                var printManager = doc.PrintManager;
-                printManager.SelectNewPrintDriver("Microsoft Print To PDF");
-                printManager.PrintRange = PrintRange.Select;
-                printManager.CombinedFile = true;
-
-                ViewSheetSetting viewSheetSetting = printManager.ViewSheetSetting;
-
-                var viewSet = new ViewSet();
-                viewSet.Insert(sheet);
-
-                viewSheetSetting.CurrentViewSheetSet.Views = viewSet;
-                viewSheetSetting.Save();
-
-                printManager.SubmitPrint();
-
+                viewSheetSetting.InSession.Views = viewSet;
                 transaction.Commit();
             }
+
+            printManager.SubmitPrint();
         }
 
         private ViewSheet CreateScheduleSheet(Document doc, ViewSchedule schedule, string scheduleName)
@@ -88,7 +111,7 @@ namespace RevitTest.Schedules.ExternalCommands
             {
                 transaction.Start();
 
-                ElementId titleBlockId = GetTitleBlockId(doc);
+                //ElementId titleBlockId = GetTitleBlockId(doc);
 
                 sheet = ViewSheet.Create(doc, ElementId.InvalidElementId);
                 sheet.Name = scheduleName;
@@ -100,79 +123,73 @@ namespace RevitTest.Schedules.ExternalCommands
             return sheet;
         }
 
-        private ElementId GetTitleBlockId(Document doc)
-        {
-            var titleBlockName = "Test Titile Block";
-            FilteredElementCollector collector = new FilteredElementCollector(doc);
-            collector.OfClass(typeof(FamilySymbol));
-            collector.OfCategory(BuiltInCategory.OST_TitleBlocks);
+        //private ElementId GetTitleBlockId(Document doc)
+        //{
+        //    var titleBlockName = "Test Titile Block";
+        //    FilteredElementCollector collector = new FilteredElementCollector(doc);
+        //    collector.OfClass(typeof(FamilySymbol));
+        //    collector.OfCategory(BuiltInCategory.OST_TitleBlocks);
 
-            List<Element> titleBlocks = collector.ToList();
-            return titleBlocks.Where(tb => tb.Name == titleBlockName).First().Id;
-        }
+        //    List<Element> titleBlocks = collector.ToList();
+        //    return titleBlocks.Where(tb => tb.Name == titleBlockName).First().Id;
+        //}
 
         private ViewSchedule CreateSchedule(Document doc, string scheduleName, ref string message)
         {
-            ViewSchedule schedule = null;
-            using (Transaction transaction = new Transaction(doc, "Create schedule"))
+            ViewSchedule schedule = GetSchedule(doc, scheduleName);
+            if (schedule == null)
             {
-                transaction.Start();
-
-                schedule = ViewSchedule.CreateSchedule(doc, new ElementId(BuiltInCategory.OST_Walls));
-                try
+                using (Transaction transaction = new Transaction(doc, "Create schedule"))
                 {
+                    transaction.Start();
+
+                    schedule = ViewSchedule.CreateSchedule(doc, new ElementId(BuiltInCategory.OST_Walls));
                     schedule.Name = scheduleName;
-                }
-                catch (Exception ex)
-                {
-                    message = ex.Message;
-                    doc.Delete(schedule.Id);
-                    return null;
-                }
 
-                var schedulableFields = schedule.Definition.GetSchedulableFields();
-                var schedulableInstances = schedulableFields.Where(f => f.FieldType == ScheduleFieldType.Instance).ToList();
-                var allowedFields = new string[] { "Type", "Family", "Volume", "Area", "Page" };
-                //ScheduleField pageField = null;
-                foreach (SchedulableField field in schedulableInstances)
-                {
-                    var name = field.GetName(doc);
-                    if (allowedFields.Contains(name))
+                    var schedulableFields = schedule.Definition.GetSchedulableFields();
+                    var schedulableInstances = schedulableFields.Where(f => f.FieldType == ScheduleFieldType.Instance).ToList();
+                    var allowedFields = new string[] { "Type", "Family", "Volume", "Area", "Page" };
+
+                    foreach (SchedulableField schField in schedulableInstances)
                     {
-                        //if (name == "Page")
-                        //{
-                        //    pageField = schedule.Definition.AddField(field);
-                        //}
-                        //else
-                        //{
-                        //    schedule.Definition.AddField(field);
-                        //}
-                        schedule.Definition.AddField(field);
+                        var name = schField.GetName(doc);
+                        if (allowedFields.Contains(name))
+                        {
+                            var field = schedule.Definition.AddField(schField);
+                            //if (name == "Page")
+                            //{
+                            //    //filter
+                            //    field.IsHidden = true;
+
+                            //    var filter = new ScheduleFilter(field.FieldId, ScheduleFilterType.Equal, 2);
+                            //    schedule.Definition.AddFilter(filter);
+                            //}
+                        }
                     }
+
+                    doc.Regenerate();
+
+                    //group headers
+                    if (schedule.CanGroupHeaders(0, 2, 0, 3))
+                    {
+                        schedule.GroupHeaders(0, 2, 0, 3, "Measurements");
+                    }
+
+                    transaction.Commit();
                 }
-
-                doc.Regenerate();
-
-                //group headers
-                if (schedule.CanGroupHeaders(0, 2, 0, 3))
-                {
-                    schedule.GroupHeaders(0, 2, 0, 3, "Measurements");
-                }
-
-                //filter
-                ScheduleField pageField = schedule.Definition.GetField(4);
-                pageField.IsHidden = true;
-
-                int val = 2;
-                var filter = new ScheduleFilter(pageField.FieldId, ScheduleFilterType.Equal, val);
-                //pageField.Definition.AddFilter(filter);
-                schedule.Definition.AddFilter(filter);
-
-
-                transaction.Commit();
             }
-
             return schedule;
+        }
+
+        private ViewSchedule GetSchedule(Document doc, string scheduleName)
+        {
+            FilteredElementCollector collector = new FilteredElementCollector(doc);
+            collector.OfClass(typeof(ViewSchedule));
+            collector.OfCategory(BuiltInCategory.OST_Schedules);
+
+            List<Element> schedules = collector.ToList();
+
+            return schedules.Where(s => s.Name.Contains(scheduleName)).ToList().First() as ViewSchedule;
         }
     }
 }
