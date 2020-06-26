@@ -70,7 +70,7 @@ namespace RevitTest.Schedules.ExternalCommands
                     catch (Exception ex)
                     {
                         //Filter not added
-
+                        TaskDialog.Show("Warning", "Filter not applied");
                     }
 
 
@@ -217,7 +217,14 @@ namespace RevitTest.Schedules.ExternalCommands
 
             List<Element> schedules = collector.ToList();
 
-            return schedules.Where(s => s.Name.Contains(scheduleName)).ToList().First() as ViewSchedule;
+            var scheduleElements = schedules.Where(s => s.Name.Contains(scheduleName)).ToList();
+
+            if (scheduleElements.Count == 1)
+            {
+                return scheduleElements.First() as ViewSchedule;
+            }
+
+            return null;
         }
     }
 }
