@@ -11,16 +11,6 @@ using Application = Autodesk.Revit.ApplicationServices.Application;
 
 namespace RevitTest.Schedules.ExternalCommands
 {
-    public class WallImage
-    {
-        public ElementId WallId { get; set; }
-        public string FileBaseName { get; set; }
-        public int A { get; set; }
-        public int B { get; set; }
-        public int C { get; set; }
-        public int D { get; set; }
-    }
-
     [Transaction(TransactionMode.Manual)]
     [Regeneration(RegenerationOption.Manual)]
     class TestScheduleCommand : IExternalCommand
@@ -145,33 +135,6 @@ namespace RevitTest.Schedules.ExternalCommands
             }
         }
 
-        private void AddImageToSchedules(UIDocument uidoc, List<ViewSchedule> schedules)
-        {
-            var doc = uidoc.Document;
-            //FilteredElementCollector annotationCollector = new FilteredElementCollector(doc);
-            //annotationCollector.OfCategory(BuiltInCategory.OST_GenericAnnotation);
-            //annotationCollector.OfClass(typeof(FamilySymbol));
-
-            foreach (ViewSchedule schedule in schedules)
-            {
-                //elements
-                var elementCollector = new FilteredElementCollector(doc, schedule.Id);
-                elementCollector.OfCategory(BuiltInCategory.OST_Walls);
-                var elements = elementCollector.ToList();
-
-                CreateImages(uidoc, elements);
-
-                using (var tran = new Transaction(doc, "Schedule cleanup"))
-                {
-                    tran.Start();
-
-                    schedule.ImageRowHeight = 0.01;
-
-                    tran.Commit();
-                }
-            }
-        }
-
         private void AddWallImages(UIDocument uidoc)
         {
             var doc = uidoc.Document;
@@ -222,76 +185,6 @@ namespace RevitTest.Schedules.ExternalCommands
                 CreateImages(uidoc, item.Key, item.Value, path);
             }
         }
-
-        private void CreateImages(UIDocument uidoc, List<Element> elements)
-        {
-            UIApplication app = uidoc.Application;
-            Document doc = uidoc.Document;
-            var rng = new Random();
-
-            var path = Path.Combine(ROOT_FOLDER, $"{ANNOTATION_TEMPLATE_NAME}.rfa");
-
-            UIDocument familyUiDoc = app.OpenAndActivateDocument(path);
-            Document familyDoc = familyUiDoc.Document;
-
-            if (familyDoc.IsFamilyDocument)
-            {
-                FilteredElementCollector textCollector = new FilteredElementCollector(familyDoc);
-                textCollector.OfClass(typeof(TextNote));
-                textCollector.OfCategory(BuiltInCategory.OST_TextNotes);
-
-                List<TextNote> textElements = textCollector.Cast<TextNote>().ToList();
-                var A = textElements.Find(tn => tn.Text.Contains("A"));
-                var B = textElements.Find(tn => tn.Text.Contains("B"));
-                var C = textElements.Find(tn => tn.Text.Contains("C"));
-                var D = textElements.Find(tn => tn.Text.Contains("D"));
-
-                foreach (var element in elements)
-                {
-                    double randA = rng.Next(10, 100);
-                    double randB = rng.Next(10, 100);
-                    double randC = rng.Next(10, 100);
-                    double randD = rng.Next(10, 100);
-
-                    using (var tran = new Transaction(familyDoc, "Modify parameters"))
-                    {
-                        tran.Start();
-
-                        A.Text = randA.ToString();
-                        B.Text = randB.ToString();
-                        C.Text = randC.ToString();
-                        D.Text = randD.ToString();
-
-                        tran.Commit();
-                    }
-
-                    var baseFileName = "testWallImg";
-                    var imageFileName = $"{baseFileName}_{randA}_{randB}_{randC}_{randD}.jpg";
-                    var imageFilePath = Path.Combine(IMAGES_FOLDER, imageFileName);
-
-                    if (!File.Exists(imageFilePath))
-                    {
-                        ExportImage(familyDoc, imageFilePath);
-                    }
-
-                    using (var tran = new Transaction(doc, "Assign instance image"))
-                    {
-                        tran.Start();
-
-                        Parameter imgParam = element.get_Parameter(BuiltInParameter.ALL_MODEL_IMAGE);
-
-                        var image = ImageType.Create(doc, imageFilePath);
-                        imgParam.Set(image.Id);
-
-                        tran.Commit();
-                    }
-                }
-
-                app.OpenAndActivateDocument(doc.PathName);
-                familyDoc.Close(false);
-            }
-        }
-
 
         private void CreateImages(UIDocument uidoc, string baseFileName, List<Element> elements, string annotationDocPath)
         {
@@ -360,7 +253,6 @@ namespace RevitTest.Schedules.ExternalCommands
             }
         }
 
-
         private static void ExportImage(Document familyDoc, string filePath)
         {
             var exportOptions = new ImageExportOptions
@@ -374,20 +266,6 @@ namespace RevitTest.Schedules.ExternalCommands
             };
 
             familyDoc.ExportImage(exportOptions);
-        }
-
-        private void HandleImgInstance(FamilyInstance instance)
-        {
-            var rng = new Random();
-            var myNumberParamList = instance.GetParameters("My Number");
-            if (myNumberParamList.Count == 1)
-            {
-                Parameter myNumberParam = myNumberParamList.First();
-                if (myNumberParam.StorageType == StorageType.Double)
-                {
-                    myNumberParam.Set(rng.NextDouble());
-                }
-            }
         }
 
         private void App_DocumentChanged(object sender, Autodesk.Revit.DB.Events.DocumentChangedEventArgs e)
@@ -501,7 +379,6 @@ namespace RevitTest.Schedules.ExternalCommands
                 }
             }
         }
-
 
         /// <summary>
         /// Get title block for ViewSheet
