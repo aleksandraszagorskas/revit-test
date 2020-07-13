@@ -88,6 +88,37 @@ namespace RevitTest.Schedules.Utilities.Revit.DB
         }
 
         /// <summary>
+        /// Create schedule
+        /// </summary>
+        /// <param name="doc"></param>
+        /// <param name="scheduleName"></param>
+        /// <param name="message"></param>
+        /// <returns></returns>
+        public static ViewSchedule CreateSchedule(Document doc, BuiltInCategory scheduleCategory, string scheduleName)
+        {
+            //CleanupSchedule(doc, scheduleName);
+            ViewSchedule schedule = null;
+
+            //create new schedule
+            using (Transaction transaction = new Transaction(doc, "Create schedule"))
+            {
+                transaction.Start();
+
+                schedule = ViewSchedule.CreateSchedule(doc, new ElementId(scheduleCategory));
+                schedule.Name = scheduleName;
+
+                transaction.Commit();
+            }
+
+            if (schedule != null)
+            {
+                HandleSchedule(doc, schedule, 1);
+            }
+
+            return schedule;
+        }
+
+        /// <summary>
         /// Create schedules
         /// </summary>
         /// <param name="doc"></param>
@@ -96,7 +127,6 @@ namespace RevitTest.Schedules.Utilities.Revit.DB
         /// <returns></returns>
         public static List<ViewSchedule> CreateSchedules(Document doc, string scheduleName, int pageItemCount)
         {
-            //CleanupSchedule(doc, scheduleName);
             var schedules = new List<ViewSchedule>();
 
             //create new schedule
@@ -108,11 +138,6 @@ namespace RevitTest.Schedules.Utilities.Revit.DB
                 collector.OfClass(typeof(Wall));
                 collector.OfCategory(BuiltInCategory.OST_Walls);
 
-                //FilteredElementCollector testCollector = new FilteredElementCollector(doc);
-                ////testCollector.OfClass(typeof(Element));
-                //testCollector.OfCategory(BuiltInCategory.OST_Walls);
-                //List<Element> testElements = testCollector.ToList();
-
                 int pageCount = (collector.GetElementCount() + pageItemCount - 1) / pageItemCount;
                 for (int i = 0; i < pageCount; i++)
                 {
@@ -121,35 +146,9 @@ namespace RevitTest.Schedules.Utilities.Revit.DB
                     schedules.Add(schedule);
                 }
 
-                //var schedule = ViewSchedule.CreateSchedule(doc, new ElementId(BuiltInCategory.OST_Walls));
-                ////schedule.Name = scheduleName;
-                ////HandleSchedule(doc, schedule, 1);
-                //schedules.Add(schedule);
-
-
-
-                //if (schedule.Definition.GetFieldCount() > pageItemCount)
-                //{
-                //    //schedule.Name = $"{scheduleName} Page 1";
-
-                //    int pageCount = (schedule.Definition.GetFieldCount() + pageItemCount - 1) / pageItemCount;
-                //    for (int i = 1; i < pageCount; i++)
-                //    {
-                //        var nextSchedule = ViewSchedule.CreateSchedule(doc, new ElementId(BuiltInCategory.OST_Walls));
-                //        //nextSchedule.Name = $"{scheduleName} Page {i + 1}";
-                //        //HandleSchedule(doc, nextSchedule, i + 1);
-                //        schedules.Add(nextSchedule);
-                //    }
-                //}
 
                 transaction.Commit();
             }
-
-            //if (schedules.Count == 1)
-            //{
-            //    schedules[0].Name = scheduleName;
-            //    HandleSchedule(doc, schedules[0], 1);
-            //}
 
             if (schedules != null)
             {
@@ -162,7 +161,54 @@ namespace RevitTest.Schedules.Utilities.Revit.DB
             return schedules;
         }
 
+        /// <summary>
+        /// Create schedules
+        /// </summary>
+        /// <param name="doc"></param>
+        /// <param name="scheduleBaseName"></param>
+        /// <param name="message"></param>
+        /// <returns></returns>
+        public static List<ViewSchedule> CreateSchedules(Document doc, BuiltInCategory category, string scheduleBaseName, int pageCount)
+        {
+            //FilteredElementCollector collector = new FilteredElementCollector(doc);
+            //collector.OfClass(type);
+            //collector.OfCategory(category);
 
+            //int pageCount = (collector.GetElementCount() + pageItemCount - 1) / pageItemCount;
+
+            var schedules = new List<ViewSchedule>();
+
+            //create new schedule
+            using (Transaction transaction = new Transaction(doc, "Create schedule"))
+            {
+                transaction.Start();
+
+                //FilteredElementCollector collector = new FilteredElementCollector(doc);
+                //collector.OfClass(typeof(Wall));
+                //collector.OfCategory(scheduleCategory);
+
+                //int pageCount = (collector.GetElementCount() + pageItemCount - 1) / pageItemCount;
+                for (int i = 0; i < pageCount; i++)
+                {
+                    var schedule = ViewSchedule.CreateSchedule(doc, new ElementId(category));
+                    schedule.Name = $"{scheduleBaseName} Page {i + 1}";
+                    schedules.Add(schedule);
+                }
+
+
+                transaction.Commit();
+            }
+
+            if (schedules != null)
+            {
+                for (int i = 0; i < schedules.Count; i++)
+                {
+                    HandleExpandableSchedule(doc, schedules[i], i + 1);
+                }
+            }
+
+            return schedules;
+        }
 
         private static void HandleSchedule(Document doc, ViewSchedule schedule, int pageNumber)
         {

@@ -59,6 +59,7 @@
     <Compile Include="Utilities\PDFUtilities.cs" />
     <Compile Include="Utilities\Revit\DB\ViewScheduleUtilities.cs" />
     <Compile Include="Utilities\Revit\DB\ViewSheetUtilities.cs" />
+    <Compile Include="Utilities\ParameterUtilities.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

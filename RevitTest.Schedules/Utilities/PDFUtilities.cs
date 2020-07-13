@@ -45,7 +45,8 @@ namespace RevitTest.Schedules.Utilities
                 }
 
                 printSetup.CurrentPrintSetting = printSetup.InSession;
-                //printSetup.SaveAs("!temp");
+
+                //printSetup.Save();
 
                 tran.Commit();
             }
@@ -62,10 +63,10 @@ namespace RevitTest.Schedules.Utilities
                 tran.Start();
 
                 viewSheetSetting.InSession.Views = viewSet;
-                //viewSheetSetting.CurrentViewSheetSet.Views = viewSet;
 
                 viewSheetSetting.CurrentViewSheetSet = viewSheetSetting.InSession;
-                //viewSheetSetting.SaveAs("!temp");
+
+                //viewSheetSetting.Save();
 
                 tran.Commit();
             }

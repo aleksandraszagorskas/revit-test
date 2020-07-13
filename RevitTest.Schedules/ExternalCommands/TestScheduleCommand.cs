@@ -1,5 +1,6 @@
 ﻿using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
+using Autodesk.Revit.DB.Structure;
 using Autodesk.Revit.UI;
 using RevitTest.Schedules.Utilities;
 using RevitTest.Schedules.Utilities.Revit.DB;
@@ -15,10 +16,12 @@ namespace RevitTest.Schedules.ExternalCommands
     [Regeneration(RegenerationOption.Manual)]
     class TestScheduleCommand : IExternalCommand
     {
-        private readonly int PAGE_ITEM_COUNT = 5;
+        private readonly int PAGE_ITEM_COUNT = 12;
+        private readonly string SHARED_PARAMETER_FILE_NAME = @"C:\Users\AleksandrasZagorskas\Desktop\revit_csd\schedules\HelloSharedParameterWorld.txt";
+        private readonly string SHARED_PARAMETER_GROUP_NAME = "My Shared Parameter Group";
         private readonly string MAIN_TITLEBLOCK_NAME = "Test Titile Block";
         private readonly string EXPANDABLE_TITLEBLOCK_NAME = "Test Expandable Titile Block";
-        private readonly string ANNOTATION_TEMPLATE_NAME = "test image fam2";
+        private readonly string ANNOTATION_TEMPLATE_NAME = "rebar-test-image";
         private readonly string ROOT_FOLDER = @"C:\Users\AleksandrasZagorskas\Desktop\revit_csd\schedules";
         private readonly string IMAGES_FOLDER = @"C:\Users\AleksandrasZagorskas\Desktop\revit_csd\schedules\images";
 
@@ -34,16 +37,44 @@ namespace RevitTest.Schedules.ExternalCommands
                 Application app = doc.Application;
                 app.DocumentChanged += App_DocumentChanged;
 
-                //var folderName = @"C:\Users\AleksandrasZagorskas\Desktop\revit_csd\schedules";
+                FilteredElementCollector rebarCollector = new FilteredElementCollector(doc);
+                rebarCollector.OfClass(typeof(Rebar));
+                rebarCollector.OfCategory(BuiltInCategory.OST_Rebar);
+                //rebarCollector.
+
+                List<Element> rebars = rebarCollector.ToList();
+
+                var rebarTypeIds = new List<ElementId>();
+                var rebarTypes = new List<Element>();
+                foreach (var rebar in rebars)
+                {
+                    ElementId typeId = rebar.GetTypeId();
+                    if (!rebarTypeIds.Contains(typeId))
+                    {
+                        var rebarBarType = doc.GetElement(typeId);
+                        rebarTypes.Add(rebarBarType);
+                        rebarTypeIds.Add(typeId);
+                    }
+                }
+
+                int pageCount = (rebars.Count() + PAGE_ITEM_COUNT - 1) / PAGE_ITEM_COUNT;
+
+                //Type rebarType = typeof(Rebar);
+                //BuiltInCategory rebarCategory = BuiltInCategory.OST_Rebar;
+
                 var fileNames = new string[] { Path.Combine(ROOT_FOLDER, $"{MAIN_TITLEBLOCK_NAME}.rfa"), Path.Combine(ROOT_FOLDER, $"{EXPANDABLE_TITLEBLOCK_NAME}.rfa"), Path.Combine(ROOT_FOLDER, $"{ANNOTATION_TEMPLATE_NAME}.rfa") };
+                var imageFilePath = Path.Combine(IMAGES_FOLDER, $"{ANNOTATION_TEMPLATE_NAME}.png");
 
 
-                AddWallTypeImages(doc);
-                AddWallImages(uidoc);
+                //debug
+                //DeleteUnusedImages(doc);
+
+                AddTypeImages(doc, rebarTypes, imageFilePath);
+                AddInstanceImages(uidoc, rebars);
 
                 LoadRequiredFamilies(doc, fileNames);
-                AddSharedParameters(doc);
-                //AddInstances(doc);
+                ParameterUtilities.AddSharedParameters(doc, SHARED_PARAMETER_FILE_NAME, SHARED_PARAMETER_GROUP_NAME);
+                HandleInstances(doc, rebars, PAGE_ITEM_COUNT);
 
                 var titleScheduleName = "Title schedule";
                 var expandableScheduleName = "Expandable schedule";
@@ -56,7 +87,8 @@ namespace RevitTest.Schedules.ExternalCommands
                 ViewSchedule titleSchedule = ViewScheduleUtilities.GetSchedule(doc, titleScheduleName);
                 if (titleSchedule == null)
                 {
-                    titleSchedule = ViewScheduleUtilities.CreateSchedule(doc, titleScheduleName);
+                    //titleSchedule = ViewScheduleUtilities.CreateSchedule(doc, titleScheduleName);
+                    titleSchedule = ViewScheduleUtilities.CreateSchedule(doc, BuiltInCategory.OST_Walls, titleScheduleName);
                 }
 
                 ViewSheet titleSheet = ViewSheetUtilities.CreateTitleSheet(doc, titleSchedule, titleScheduleName, titleBlock.Id);
@@ -72,16 +104,14 @@ namespace RevitTest.Schedules.ExternalCommands
                 List<ViewSchedule> expandingSchedules = ViewScheduleUtilities.GetSchedules(doc, expandableScheduleName);
                 if (expandingSchedules == null)
                 {
-                    expandingSchedules = ViewScheduleUtilities.CreateSchedules(doc, expandableScheduleName, PAGE_ITEM_COUNT);
+                    //expandingSchedules = ViewScheduleUtilities.CreateSchedules(doc, expandableScheduleName, PAGE_ITEM_COUNT);
+                    expandingSchedules = ViewScheduleUtilities.CreateSchedules(doc, BuiltInCategory.OST_Rebar, expandableScheduleName, pageCount);
                 }
 
-                //AddImageToSchedules(uidoc, expandingSchedules);
-                
                 var expandingSheets = new List<ViewSheet>();
                 for (int i = 0; i < expandingSchedules.Count; i++)
                 {
                     ViewSheet expandingSheet = ViewSheetUtilities.CreateExpandableSheet(doc, expandingSchedules[i], expandableScheduleName, i + 1, expandableTitleBlock.Id);
-                    //sheets.Add(expandingSheet);
                     expandingSheets.Add(expandingSheet);
                 }
                 sheets.AddRange(expandingSheets);
@@ -98,34 +128,75 @@ namespace RevitTest.Schedules.ExternalCommands
             }
         }
 
-        private void AddWallTypeImages(Document doc)
+        private void DeleteUnusedImages(Document doc)
         {
-            FilteredElementCollector collector = new FilteredElementCollector(doc);
-            collector.OfClass(typeof(Wall));
-            collector.OfCategory(BuiltInCategory.OST_Walls);
+            var imageCollector = new FilteredElementCollector(doc);
+            imageCollector.OfCategory(BuiltInCategory.OST_RasterImages);
+            imageCollector.OfClass(typeof(ImageType));
+            List<ImageType> images = imageCollector.Cast<ImageType>().ToList();
 
-            var walls = collector.Cast<Wall>().ToList();
-            var wallTypeIds = new List<ElementId>();
-            foreach (var wall in walls)
-            {
-                if (!wallTypeIds.Contains(wall.WallType.Id))
-                {
-                    wallTypeIds.Add(wall.WallType.Id);
-                }
-            }
-
-            using (var tran = new Transaction(doc, "Set wall type images"))
+            using (var tran = new Transaction(doc, "Project cleanup"))
             {
                 tran.Start();
 
-                foreach (var wallTypeId in wallTypeIds)
+                foreach (var image in images)
                 {
-                    var wallType = doc.GetElement(wallTypeId) as WallType;
-                    var imgParam = wallType.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_IMAGE);
+                    doc.Delete(image.Id);
+                }
+
+                tran.Commit();
+            }
+
+
+        }
+
+        private void AddTypeImages(Document doc, List<Element> typeElements, string defaultImagePath)
+        {
+            //FilteredElementCollector collector = new FilteredElementCollector(doc);
+            //collector.OfClass(type);
+            //collector.OfCategory(category);
+            //List<Element> instanceElements = collector.ToList();
+
+            //var typeIds = new List<ElementId>();
+            //var typeElements = new List<Element>();
+            //foreach (var instance in instanceElements)
+            //{
+            //    ElementId typeId = instance.GetTypeId();
+            //    if (!typeIds.Contains(typeId))
+            //    {
+            //        var typeElement = doc.GetElement(typeId);
+            //        typeElements.Add(typeElement);
+            //        typeIds.Add(typeId);
+            //    }
+            //}
+
+            using (var tran = new Transaction(doc, "Set type images"))
+            {
+                tran.Start();
+
+                foreach (Element typeElement in typeElements)
+                {
+                    var imageCollector = new FilteredElementCollector(doc);
+                    imageCollector.OfCategory(BuiltInCategory.OST_RasterImages);
+                    imageCollector.OfClass(typeof(ImageType));
+                    List<ImageType> images = imageCollector.Cast<ImageType>().ToList();
+
+                    var imgParam = typeElement.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_IMAGE);
                     if (imgParam.AsElementId() == ElementId.InvalidElementId)
                     {
-                        var imageFilePath = Path.Combine(IMAGES_FOLDER, "rebar-test-image.png");
-                        var image = ImageType.Create(doc, imageFilePath);
+
+                        //var image = ImageType.Create(doc, defaultImagePath);
+                        ImageType image = null;
+                        string fileName = Path.GetFileName(defaultImagePath);
+                        List<ImageType> imageFilter = images.Where(i => Path.GetFileName(i.Name).Contains(fileName)).ToList();//?.First();
+                        if (imageFilter.Any())
+                        {
+                            image = imageFilter.First();
+                        }
+                        else
+                        {
+                            image = ImageType.Create(doc, defaultImagePath);
+                        }
 
                         imgParam.Set(image.Id);
                     }
@@ -135,20 +206,21 @@ namespace RevitTest.Schedules.ExternalCommands
             }
         }
 
-        private void AddWallImages(UIDocument uidoc)
+        private void AddInstanceImages(UIDocument uidoc, List<Element> instanceElements)
         {
             var doc = uidoc.Document;
+            //FilteredElementCollector collector = new FilteredElementCollector(doc);
+            //collector.OfClass(type);
+            //collector.OfCategory(category);
+            //List<Element> instanceElements = collector.ToList();
 
-            FilteredElementCollector collector = new FilteredElementCollector(doc);
-            collector.OfClass(typeof(Wall));
-            collector.OfCategory(BuiltInCategory.OST_Walls);
-
-            var wallsWithoutImage = new Dictionary<string, List<Element>>();
-
-            var walls = collector.Cast<Wall>().ToList();
-            foreach (var wall in walls)
+            var elementsWithoutImage = new Dictionary<string, List<Element>>();
+            foreach (var instanceElement in instanceElements)
             {
-                Parameter imgParam = wall.WallType.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_IMAGE);
+                ElementId instanceTypeId = instanceElement.GetTypeId();
+                Element instanceType = doc.GetElement(instanceTypeId);
+
+                Parameter imgParam = instanceType.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_IMAGE);
                 if (imgParam.AsElementId() != ElementId.InvalidElementId)
                 {
                     ElementId imgId = imgParam.AsElementId();
@@ -156,35 +228,28 @@ namespace RevitTest.Schedules.ExternalCommands
 
                     var baseFileName = Path.GetFileNameWithoutExtension(img.Path);
 
-                    if (!wallsWithoutImage.ContainsKey(baseFileName))
+                    if (!elementsWithoutImage.ContainsKey(baseFileName))
                     {
                         var list = new List<Element>();
-                        list.Add(wall);
+                        list.Add(instanceElement);
 
-                        wallsWithoutImage.Add(baseFileName, list);
+                        elementsWithoutImage.Add(baseFileName, list);
                     }
                     else
                     {
-                        wallsWithoutImage[baseFileName].Add(wall);
+                        elementsWithoutImage[baseFileName].Add(instanceElement);
                     }
                 }
             }
 
-            foreach (var item in wallsWithoutImage)
+            foreach (var item in elementsWithoutImage)
             {
-                //var path = Path.Combine(ROOT_FOLDER, $"{ANNOTATION_TEMPLATE_NAME}.rfa");
                 var path = Path.Combine(ROOT_FOLDER, $"{item.Key}.rfa");
-
-                //debug
-                if (item.Key == "rebar-test-image")
-                {
-
-                    path = Path.Combine(ROOT_FOLDER, $"{ANNOTATION_TEMPLATE_NAME}.rfa");
-                }
 
                 CreateImages(uidoc, item.Key, item.Value, path);
             }
         }
+
 
         private void CreateImages(UIDocument uidoc, string baseFileName, List<Element> elements, string annotationDocPath)
         {
@@ -200,34 +265,119 @@ namespace RevitTest.Schedules.ExternalCommands
                 FilteredElementCollector textCollector = new FilteredElementCollector(familyDoc);
                 textCollector.OfClass(typeof(TextNote));
                 textCollector.OfCategory(BuiltInCategory.OST_TextNotes);
-
                 List<TextNote> textElements = textCollector.Cast<TextNote>().ToList();
-                var A = textElements.Find(tn => tn.Text.Contains("A"));
-                var B = textElements.Find(tn => tn.Text.Contains("B"));
-                var C = textElements.Find(tn => tn.Text.Contains("C"));
-                var D = textElements.Find(tn => tn.Text.Contains("D"));
+
+                string paramAName = "A";
+                string paramBName = "B";
+                string paramCName = "C";
+                string paramDName = "D";
+                string paramEName = "E";
+                string paramFName = "F";
+                string paramGName = "G";
+                string paramHName = "H";
+                string paramJName = "J";
+                string paramKName = "K";
+                string paramOName = "O";
+                string paramRName = "R";
+
+                var A = textElements.Find(tn => tn.Text.Contains(paramAName));
+                var B = textElements.Find(tn => tn.Text.Contains(paramBName));
+                var C = textElements.Find(tn => tn.Text.Contains(paramCName));
+                var D = textElements.Find(tn => tn.Text.Contains(paramDName));
+                var E = textElements.Find(tn => tn.Text.Contains(paramEName));
+                var F = textElements.Find(tn => tn.Text.Contains(paramFName));
+                var G = textElements.Find(tn => tn.Text.Contains(paramGName));
+                var H = textElements.Find(tn => tn.Text.Contains(paramHName));
+                var J = textElements.Find(tn => tn.Text.Contains(paramJName));
+                var K = textElements.Find(tn => tn.Text.Contains(paramKName));
+                var O = textElements.Find(tn => tn.Text.Contains(paramOName));
+                var R = textElements.Find(tn => tn.Text.Contains(paramRName));
 
                 foreach (var element in elements)
                 {
-                    double randA = rng.Next(10, 100);
-                    double randB = rng.Next(10, 100);
-                    double randC = rng.Next(10, 100);
-                    double randD = rng.Next(10, 100);
+                    Parameter paramA = element.GetParameters(paramAName).Count() == 1 ? element.GetParameters(paramAName).First() : null;
+                    Parameter paramB = element.GetParameters(paramBName).Count() == 1 ? element.GetParameters(paramBName).First() : null;
+                    Parameter paramC = element.GetParameters(paramCName).Count() == 1 ? element.GetParameters(paramCName).First() : null;
+                    Parameter paramD = element.GetParameters(paramDName).Count() == 1 ? element.GetParameters(paramDName).First() : null;
+                    Parameter paramE = element.GetParameters(paramEName).Count() == 1 ? element.GetParameters(paramEName).First() : null;
+                    Parameter paramF = element.GetParameters(paramFName).Count() == 1 ? element.GetParameters(paramFName).First() : null;
+                    Parameter paramG = element.GetParameters(paramGName).Count() == 1 ? element.GetParameters(paramGName).First() : null;
+                    Parameter paramH = element.GetParameters(paramHName).Count() == 1 ? element.GetParameters(paramHName).First() : null;
+                    Parameter paramJ = element.GetParameters(paramJName).Count() == 1 ? element.GetParameters(paramJName).First() : null;
+                    Parameter paramK = element.GetParameters(paramKName).Count() == 1 ? element.GetParameters(paramKName).First() : null;
+                    Parameter paramO = element.GetParameters(paramOName).Count() == 1 ? element.GetParameters(paramOName).First() : null;
+                    Parameter paramR = element.GetParameters(paramRName).Count() == 1 ? element.GetParameters(paramRName).First() : null;
+
+                    string paramAs = FormatParam(paramA);
+                    string paramBs = FormatParam(paramB);
+                    string paramCs = FormatParam(paramC);
+                    string paramDs = FormatParam(paramD);
+                    string paramEs = FormatParam(paramE);
+                    string paramFs = FormatParam(paramF);
+                    string paramGs = FormatParam(paramG);
+                    string paramHs = FormatParam(paramH);
+                    string paramJs = FormatParam(paramJ);
+                    string paramKs = FormatParam(paramK);
+                    string paramOs = FormatParam(paramO);
+                    string paramRs = FormatParam(paramR);
 
                     using (var tran = new Transaction(familyDoc, "Modify parameters"))
                     {
                         tran.Start();
 
-                        A.Text = randA.ToString();
-                        B.Text = randB.ToString();
-                        C.Text = randC.ToString();
-                        D.Text = randD.ToString();
+                        if (A != null && paramAs != null)
+                        {
+                            A.Text = paramAs;
+                        }
+                        if (B != null && paramBs != null)
+                        {
+                            B.Text = paramBs;
+                        }
+                        if (C != null && paramCs != null)
+                        {
+                            C.Text = paramCs;
+                        }
+                        if (D != null && paramDs != null)
+                        {
+                            D.Text = paramDs;
+                        }
+                        if (E != null && paramEs != null)
+                        {
+                            E.Text = paramEs;
+                        }
+                        if (F != null && paramFs != null)
+                        {
+                            F.Text = paramFs;
+                        }
+                        if (G != null && paramGs != null)
+                        {
+                            G.Text = paramGs;
+                        }
+                        if (H != null && paramHs != null)
+                        {
+                            H.Text = paramHs;
+                        }
+                        if (J != null && paramJs != null)
+                        {
+                            J.Text = paramJs;
+                        }
+                        if (K != null && paramKs != null)
+                        {
+                            K.Text = paramKs;
+                        }
+                        if (O != null && paramOs != null)
+                        {
+                            O.Text = paramOs;
+                        }
+                        if (R != null && paramRs != null)
+                        {
+                            R.Text = paramRs;
+                        }
 
                         tran.Commit();
                     }
 
-                    //var baseFileName = "testWallImg";
-                    var imageFileName = $"{baseFileName}_{randA}_{randB}_{randC}_{randD}.jpg";
+                    var imageFileName = $"{baseFileName}_{paramAs}_{paramBs}_{paramCs}_{paramDs}.jpg";
                     var imageFilePath = Path.Combine(IMAGES_FOLDER, imageFileName);
 
                     if (!File.Exists(imageFilePath))
@@ -235,13 +385,28 @@ namespace RevitTest.Schedules.ExternalCommands
                         ExportImage(familyDoc, imageFilePath);
                     }
 
+                    var imageCollector = new FilteredElementCollector(doc);
+                    imageCollector.OfCategory(BuiltInCategory.OST_RasterImages);
+                    imageCollector.OfClass(typeof(ImageType));
+                    List<ImageType> images = imageCollector.Cast<ImageType>().ToList();
+
                     using (var tran = new Transaction(doc, "Assign instance image"))
                     {
                         tran.Start();
 
                         Parameter imgParam = element.get_Parameter(BuiltInParameter.ALL_MODEL_IMAGE);
 
-                        var image = ImageType.Create(doc, imageFilePath);
+                        ImageType image = null;
+                        List<ImageType> imageFilter = images.Where(i => Path.GetFileName(i.Name).Contains(imageFileName)).ToList();//?.First();
+                        if (imageFilter.Any())
+                        {
+                            image = imageFilter.First();
+                        }
+                        else
+                        {
+                            image = ImageType.Create(doc, imageFilePath);
+                        }
+
                         imgParam.Set(image.Id);
 
                         tran.Commit();
@@ -251,6 +416,17 @@ namespace RevitTest.Schedules.ExternalCommands
                 app.OpenAndActivateDocument(doc.PathName);
                 familyDoc.Close(false);
             }
+        }
+
+        private string FormatParam(Parameter param)
+        {
+            if (param != null && param.StorageType == StorageType.Double)
+            {
+                double val = Math.Round(param.AsDouble(), 2);
+                int convVal = (int)(val * 100);
+                return convVal.ToString();
+            }
+            return null;
         }
 
         private static void ExportImage(Document familyDoc, string filePath)
@@ -274,58 +450,7 @@ namespace RevitTest.Schedules.ExternalCommands
             List<ElementId> deletedElementIds = e.GetDeletedElementIds().ToList();
         }
 
-        private void AddSharedParameters(Document doc)
-        {
-            var app = doc.Application;
 
-            //open shared parameter file
-            app.SharedParametersFilename = @"C:\Users\AleksandrasZagorskas\Desktop\revit_csd\schedules\HelloSharedParameterWorld.txt";
-            DefinitionFile currentDefinitionFile = app.OpenSharedParameterFile();
-
-            //get groups
-            DefinitionGroups defGroups = currentDefinitionFile.Groups;
-            DefinitionGroup defGroup = defGroups.get_Item("My Shared Parameter Group");
-            Definitions allDefinitions = defGroup.Definitions;
-
-            if (defGroup != null)
-            {
-                //get categories
-                Category sheetCategory = doc.Settings.Categories.get_Item(BuiltInCategory.OST_Sheets);
-                CategorySet sheetCategories = app.Create.NewCategorySet();
-                sheetCategories.Insert(sheetCategory);
-
-                Category wallCategory = doc.Settings.Categories.get_Item(BuiltInCategory.OST_Walls);
-                CategorySet wallCategories = app.Create.NewCategorySet();
-                wallCategories.Insert(wallCategory);
-
-                InstanceBinding sheetBinding = app.Create.NewInstanceBinding(sheetCategories);
-                InstanceBinding wallBinding = app.Create.NewInstanceBinding(wallCategories);
-
-                BindingMap bindingMap = doc.ParameterBindings;
-
-                using (Transaction tran = new Transaction(doc, "Adding shared parameters"))
-                {
-                    tran.Start();
-
-                    foreach (Definition item in allDefinitions)
-                    {
-                        if (item.Name == "My Text" || item.Name == "My Number")
-                        {
-                            bindingMap.Insert(item, sheetBinding, BuiltInParameterGroup.PG_DATA);
-                        }
-                        else if (item.Name == "My Page")
-                        {
-                            bindingMap.Insert(item, wallBinding, BuiltInParameterGroup.PG_DATA);
-                        }
-                    }
-
-                    tran.Commit();
-                }
-            }
-
-            //Initial values new parameters
-            HandleWalls(doc, PAGE_ITEM_COUNT);
-        }
 
         private void LoadRequiredFamilies(Document doc, string[] fileNameArray)
         {
@@ -343,23 +468,21 @@ namespace RevitTest.Schedules.ExternalCommands
             }
         }
 
-        private void HandleWalls(Document doc, int pageItemCount)
+        private void HandleInstances(Document doc, List<Element> instanceElements, int pageItemCount)
         {
-            FilteredElementCollector collector = new FilteredElementCollector(doc);
-            collector.OfClass(typeof(Wall));
-            collector.OfCategory(BuiltInCategory.OST_Walls);
-
-            List<Element> walls = collector.ToList();
+            //FilteredElementCollector collector = new FilteredElementCollector(doc);
+            //collector.OfClass(type);
+            //collector.OfCategory(category);
+            //List<Element> instanceElements = collector.ToList();
 
             var pageNumber = 1;
-
-            for (int i = 0; i < walls.Count; i++)
+            for (int i = 0; i < instanceElements.Count; i++)
             {
-                var myPageParamList = walls[i].GetParameters("My Page");
+                var myPageParamList = instanceElements[i].GetParameters("My Page");
 
                 if (myPageParamList.Count == 1)
                 {
-                    using (var tran = new Transaction(doc, "Handle wall"))
+                    using (var tran = new Transaction(doc, "Handle rebar"))
                     {
                         tran.Start();
 
