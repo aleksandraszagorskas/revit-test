@@ -163,7 +163,7 @@ namespace RevitTest.Schedules.ExternalCommands
             int numOfRows = tableBodySection.NumberOfRows;
             int numOfCols = tableBodySection.NumberOfColumns;
             var cellData = new string[numOfRows, numOfCols];
-            expandableSchedule.
+            //expandableSchedule.
             for (int i = 0; i < numOfRows; i++)
             {
                 for (int j = 0; j < numOfCols; j++)
