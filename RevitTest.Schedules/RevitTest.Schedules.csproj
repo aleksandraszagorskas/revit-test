@@ -31,14 +31,24 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="PresentationFramework" />
-    <Reference Include="RevitAPI">
-      <HintPath>C:\Program Files\Autodesk\Revit 2018\RevitAPI.dll</HintPath>
-      <Private>False</Private>
+    <Reference Include="AdWindows, Version=2016.11.4.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Autodesk.Revit.SDK.2018.2.0\lib\net46\AdWindows.dll</HintPath>
     </Reference>
-    <Reference Include="RevitAPIUI">
-      <HintPath>C:\Program Files\Autodesk\Revit 2018\RevitAPIUI.dll</HintPath>
-      <Private>False</Private>
+    <Reference Include="PresentationFramework" />
+    <Reference Include="RevitAPI, Version=18.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <HintPath>..\packages\Autodesk.Revit.SDK.2018.2.0\lib\net46\RevitAPI.dll</HintPath>
+    </Reference>
+    <Reference Include="RevitAPIIFC, Version=18.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <HintPath>..\packages\Autodesk.Revit.SDK.2018.2.0\lib\net46\RevitAPIIFC.dll</HintPath>
+    </Reference>
+    <Reference Include="RevitAPIMacros, Version=18.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <HintPath>..\packages\Autodesk.Revit.SDK.2018.2.0\lib\net46\RevitAPIMacros.dll</HintPath>
+    </Reference>
+    <Reference Include="RevitAPIUI, Version=18.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <HintPath>..\packages\Autodesk.Revit.SDK.2018.2.0\lib\net46\RevitAPIUI.dll</HintPath>
+    </Reference>
+    <Reference Include="RevitAPIUIMacros, Version=18.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <HintPath>..\packages\Autodesk.Revit.SDK.2018.2.0\lib\net46\RevitAPIUIMacros.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -53,13 +63,22 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="App.cs" />
+    <Compile Include="ExternalCommands\ChangeSchedulePageCommand.cs" />
+    <Compile Include="ExternalCommands\SplitScheduleCommand.cs" />
+    <Compile Include="ExternalCommands\MasterScheduleCommand.cs" />
     <Compile Include="ExternalCommands\TestScheduleCommand.cs" />
-    <Compile Include="Models\Class1.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Utilities\FamilyUtilities.cs" />
+    <Compile Include="Utilities\ImageUtilities.cs" />
     <Compile Include="Utilities\PDFUtilities.cs" />
     <Compile Include="Utilities\Revit\DB\ViewScheduleUtilities.cs" />
     <Compile Include="Utilities\Revit\DB\ViewSheetUtilities.cs" />
     <Compile Include="Utilities\ParameterUtilities.cs" />
+    <Compile Include="Utilities\Revit\UI\UIViewUtilities.cs" />
+    <Compile Include="Utilities\Win32Utilities.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

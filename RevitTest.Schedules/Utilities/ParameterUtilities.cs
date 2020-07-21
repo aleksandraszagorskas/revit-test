@@ -62,5 +62,31 @@ namespace RevitTest.Schedules.Utilities
             //HandleWalls(doc, PAGE_ITEM_COUNT);
             //HandleRebars(doc, PAGE_ITEM_COUNT);
         }
+
+        public static string FormatParam(Parameter param)
+        {
+            if (param != null && param.StorageType == StorageType.Double)
+            {
+                double val = Math.Round(param.AsDouble(), 2);
+                int convVal = (int)(val * 100);
+                return convVal.ToString();
+            }
+            return null;
+        }
+
+        public static string FormatParam(Document doc, Parameter param)
+        {
+            Units units = doc.GetUnits();
+            if (param != null && param.StorageType == StorageType.Double)
+            {
+                double val = param.AsDouble();
+                string formatedVal = UnitFormatUtils.Format(units, UnitType.UT_Length, val, false, false);
+
+                //double val = Math.Round(param.AsDouble(), 2);
+                //int convVal = (int)(val * 100);
+                return formatedVal;
+            }
+            return null;
+        }
     }
 }
