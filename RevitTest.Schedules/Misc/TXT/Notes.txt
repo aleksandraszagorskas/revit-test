@@ -1,0 +1,2 @@
+﻿1. Grouping can fail if record has first value but doesn't have other values, because that is the definition of a group according to Revit export rules.
+2. When creating tamplate parameters it is preferable to use "Wrap Text" on parameter cell.

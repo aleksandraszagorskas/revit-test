@@ -16,16 +16,7 @@ namespace RevitTest.Schedules.ExternalCommands
     [Regeneration(RegenerationOption.Manual)]
     class TestScheduleCommand : IExternalCommand
     {
-        private readonly int PAGE_ITEM_COUNT = 12;
-        private readonly string SHARED_PARAMETER_FILE_NAME = @"C:\Users\AleksandrasZagorskas\Desktop\revit_csd\schedules\HelloSharedParameterWorld.txt";
-        private readonly string SHARED_PARAMETER_GROUP_NAME = "My Shared Parameter Group";
-        private readonly string MAIN_TITLEBLOCK_NAME = "Test Titile Block";
-        private readonly string EXPANDABLE_TITLEBLOCK_NAME = "Test Expandable Titile Block";
-        private readonly string MAIN_LIST_NAME = "Title schedule";
-        private readonly string EXPANDABLE_LIST_NAME = "Expandable schedule";
-        private readonly string ANNOTATION_TEMPLATE_NAME = "rebar-test-image";
-        private readonly string ROOT_FOLDER = @"C:\Users\AleksandrasZagorskas\Desktop\revit_csd\schedules";
-        private readonly string IMAGES_FOLDER = @"C:\Users\AleksandrasZagorskas\Desktop\revit_csd\schedules\images";
+        private static Misc.Settings settings = Misc.Settings.Instance;
 
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
@@ -56,12 +47,12 @@ namespace RevitTest.Schedules.ExternalCommands
                     }
                 }
 
-                int pageCount = (rebars.Count() + PAGE_ITEM_COUNT - 1) / PAGE_ITEM_COUNT;
+                int pageCount = (rebars.Count() + settings.PAGE_ITEM_COUNT - 1) / settings.PAGE_ITEM_COUNT;
                 #endregion
 
 
-                var fileNames = new string[] { Path.Combine(ROOT_FOLDER, $"{MAIN_TITLEBLOCK_NAME}.rfa"), Path.Combine(ROOT_FOLDER, $"{EXPANDABLE_TITLEBLOCK_NAME}.rfa"), Path.Combine(ROOT_FOLDER, $"{ANNOTATION_TEMPLATE_NAME}.rfa") };
-                var imageFilePath = Path.Combine(IMAGES_FOLDER, $"{ANNOTATION_TEMPLATE_NAME}.png");
+                var fileNames = new string[] { Path.Combine(settings.ROOT_FOLDER, $"{settings.MAIN_TITLEBLOCK_NAME}.rfa"), Path.Combine(settings.ROOT_FOLDER, $"{settings.EXPANDABLE_TITLEBLOCK_NAME}.rfa"), settings.DEFAULT_ANNOTATION_FILE_NAME };
+                var imageFilePath = settings.DEFAULT_ANNOTATION_IMAGE_FILE_NAME;
 
 
                 //debug
@@ -71,18 +62,18 @@ namespace RevitTest.Schedules.ExternalCommands
                 ImageUtilities.AddInstanceImages(uidoc, rebars);
 
                 FamilyUtilities.LoadRequiredFamilies(doc, fileNames);
-                ParameterUtilities.AddSharedParameters(doc, SHARED_PARAMETER_FILE_NAME, SHARED_PARAMETER_GROUP_NAME);
+                ParameterUtilities.AddSharedParameters(doc, settings.SHARED_PARAMETER_FILE_NAME, settings.SHARED_PARAMETER_GROUP_NAME);
 
                 var sheets = new List<ViewSheet>();
 
                 #region TitleBlock
-                ViewSchedule titleSchedule = ViewScheduleUtilities.GetSchedule(doc, MAIN_LIST_NAME);
+                ViewSchedule titleSchedule = ViewScheduleUtilities.GetSchedule(doc, settings.MAIN_LIST_NAME);
                 if (titleSchedule == null)
                 {
-                    titleSchedule = ViewScheduleUtilities.CreateSchedule(doc, BuiltInCategory.OST_Walls, MAIN_LIST_NAME);
+                    titleSchedule = ViewScheduleUtilities.CreateSchedule(doc, BuiltInCategory.OST_Walls, settings.MAIN_LIST_NAME);
                 }
 
-                ViewSheet titleSheet = ViewSheetUtilities.CreateTitleSheet(doc, MAIN_TITLEBLOCK_NAME, titleSchedule, MAIN_LIST_NAME);
+                ViewSheet titleSheet = ViewSheetUtilities.CreateTitleSheet(doc, settings.MAIN_TITLEBLOCK_NAME, titleSchedule, settings.MAIN_LIST_NAME);
                 sheets.Add(titleSheet);
                 #endregion
 
@@ -90,16 +81,16 @@ namespace RevitTest.Schedules.ExternalCommands
                 uidoc.ActiveView = titleSheet;
 
                 #region ExpandingBlock
-                List<ViewSchedule> expandingSchedules = ViewScheduleUtilities.GetSchedules(doc, EXPANDABLE_LIST_NAME);
+                List<ViewSchedule> expandingSchedules = ViewScheduleUtilities.GetSchedules(doc, settings.EXPANDABLE_LIST_NAME);
                 if (expandingSchedules == null)
                 {
-                    expandingSchedules = ViewScheduleUtilities.CreateSchedules(doc, BuiltInCategory.OST_Rebar, EXPANDABLE_LIST_NAME, pageCount);
+                    expandingSchedules = ViewScheduleUtilities.CreateSchedules(doc, BuiltInCategory.OST_Rebar, settings.EXPANDABLE_LIST_NAME, pageCount);
                 }
 
                 var expandingSheets = new List<ViewSheet>();
                 for (int i = 0; i < expandingSchedules.Count; i++)
                 {
-                    ViewSheet expandingSheet = ViewSheetUtilities.CreateExpandableSheet(uidoc, EXPANDABLE_TITLEBLOCK_NAME, expandingSchedules[i], EXPANDABLE_LIST_NAME, i + 1);
+                    ViewSheet expandingSheet = ViewSheetUtilities.CreateExpandableSheet(uidoc, settings.EXPANDABLE_TITLEBLOCK_NAME, expandingSchedules[i], settings.EXPANDABLE_LIST_NAME, i + 1);
                     expandingSheets.Add(expandingSheet);
                 }
                 sheets.AddRange(expandingSheets);
